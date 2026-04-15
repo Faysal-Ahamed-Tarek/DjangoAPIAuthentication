@@ -1,15 +1,39 @@
+# Environment variables
 .env
+.env.*
+
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Django local database and uploads
 db.sqlite3
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.sqlite3
 *.db
-*.sqlite3
+media/
+
+# Logs
 *.log
+
+# Translation files
 *.pot
-*.pyc
-*.pyo
-*.pyd
-__pycache__/
-*.sqlite3
+
+# Test/coverage/cache artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker/lint caches
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# IDE/editor settings
+.idea/
