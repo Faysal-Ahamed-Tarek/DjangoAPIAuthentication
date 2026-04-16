@@ -5,13 +5,13 @@ from apps.users.serializers import UserRegistrationSerializer
 from rest_framework import generics
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from apps.users.utils import send_verification_email
+from apps.users.utils import send_verification_email, send_password_reset_email
 from .models import User
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
-from .serializers import UserLoginSerializer, LogoutSerializer, UserProfileSerializer
+from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, PasswordResetTokenSerializer, UserLoginSerializer, LogoutSerializer, UserProfileSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from django.urls import reverse
 
 
 class RegisterView(generics.CreateAPIView):
@@ -109,7 +109,6 @@ class LogoutView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
 
         refresh_token = serializer.validated_data["refresh"]
-        access_token = serializer.validated_data["access"]
         try:
             refresh_token = RefreshToken(refresh_token)
             refresh_token.blacklist()
@@ -119,3 +118,55 @@ class LogoutView(generics.GenericAPIView):
                 {"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST
             )
         return Response({"message": "Logout successful."}, status=status.HTTP_200_OK)
+
+
+
+class passwordResetRequestView(generics.GenericAPIView):
+    serializer_class = PasswordResetRequestSerializer
+    permission_classes = [AllowAny]
+
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+        send_password_reset_email(user, request)
+
+        return Response(
+            {"message": "Password reset email sent. Please check your inbox."},
+            status=status.HTTP_200_OK,
+        )
+
+class passwordResetTokenConfirmView(generics.GenericAPIView):
+    serializer_class = PasswordResetTokenSerializer
+    permission_classes = [AllowAny]
+
+    
+    def get(self, request, token):
+        serializer = self.get_serializer(data={"token": token})
+        serializer.is_valid(raise_exception=True)
+
+        return Response(
+            {"message": "Token is valid. You can now reset your password.", "token": token},
+            status=status.HTTP_200_OK,
+        )
+    
+
+class PasswordResetConfirmView(generics.GenericAPIView):
+    serializer_class = PasswordResetConfirmSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data = request.data)
+        serializer.is_valid(raise_exception = True)
+
+        password = serializer.validated_data["new_password"]
+        user = serializer.validated_data["user"]
+        user.set_password(password)
+        user.save()
+
+        return Response(
+            {"message": "Password has been reset successfully."},
+            status=status.HTTP_200_OK,
+        )

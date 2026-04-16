@@ -5,6 +5,8 @@ from rest_framework.validators import UniqueValidator
 from apps.users.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework.permissions import AllowAny
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -78,11 +80,75 @@ class UserLoginSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'is_verified']
-        read_only_fields = ['username', 'email', 'is_verified']
+        fields = ['username', 'first_name', 'last_name', 'email']
+        read_only_fields = ['username', 'email']
+
 
 
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField(required=True)
     access = serializers.CharField(required=True)
 
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+    def validate(self, attrs):
+        try : 
+            email = attrs.get("email")
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "No user is associated with this email address."})
+        
+        if not user.is_verified :
+            raise serializers.ValidationError("This account is not validated yet.")
+        attrs['user'] = user
+        return attrs
+
+
+
+class PasswordResetTokenSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+
+    def validate_token(self, data):
+        try : 
+            token = AccessToken(data)
+            try : 
+                user = User.objects.get(id=token["user_id"])
+            except User.DoesNotExist:
+                raise serializers.ValidationError({"token": "User not found."})
+            
+            if not user.is_active:
+                raise serializers.ValidationError("This account is not validated yet.")
+            
+        except :
+            raise serializers.ValidationError({"token": "Invalid token."})
+        return data
+
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+    new_password = serializers.CharField(write_only=True, required=True, validators=[validate_password], style={'input_type': 'password'})
+    confirm_new_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+
+
+    def validate(self, data):
+        try:
+            token = AccessToken(data["token"])
+            user = User.objects.get(id=token["user_id"])
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"token": "User not found."})
+        except Exception:
+            raise serializers.ValidationError({"token": "Invalid token."})
+
+        if not user.is_active:
+            raise serializers.ValidationError("This account is not validated yet.")
+
+        if data['new_password'] != data['confirm_new_password']:
+            raise serializers.ValidationError({"new_password": "Passwords do not match.", "confirm_new_password": "Passwords do not match."})
+        
+        data["user"] = user
+        return data
+    
