@@ -3,15 +3,16 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.urls import reverse
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from .models import User
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
 
 
 
 def send_verification_email(user, request):
-    refresh_token = RefreshToken.for_user(user)
-    access_token = str(refresh_token.access_token)
-    verification_path = reverse('verify_email', kwargs={'token': access_token})
+    token = PasswordResetTokenGenerator().make_token(user)
+    verification_path = reverse('verify_email', kwargs={'uidb64': urlsafe_base64_encode(force_bytes(user.pk)), 'token': token})
     verification_link = request.build_absolute_uri(verification_path)
     
     context = {
@@ -37,11 +38,9 @@ def send_verification_email(user, request):
 
 def send_password_reset_email(user, request):
 
-    token = AccessToken.for_user(user)
-    token["password_reset"] = True
-
+    token = PasswordResetTokenGenerator().make_token(user)
     url = request.build_absolute_uri(
-        reverse("password_reset_token_confirm", kwargs={"token": str(token)})
+        reverse("password_reset_token_confirm", kwargs={"uidb64": urlsafe_base64_encode(force_bytes(user.pk)), "token": str(token)})
     )
 
     context = {
